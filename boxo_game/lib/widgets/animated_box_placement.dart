@@ -32,7 +32,7 @@ class _AnimatedBoxPlacementState extends State<AnimatedBoxPlacement>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 200), // Much faster
       vsync: this,
     );
 
@@ -42,25 +42,25 @@ class _AnimatedBoxPlacementState extends State<AnimatedBoxPlacement>
       end: widget.endPosition,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOut, // Smoother
     ));
 
     // Opacity animation - starts from 0 to 1
     _opacityAnimation = Tween<double>(
-      begin: 0.0,
+      begin: 0.3,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+      curve: Curves.easeIn,
     ));
 
     // Scale animation for a nice effect
     _scaleAnimation = Tween<double>(
-      begin: 0.8,
+      begin: 0.9,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.elasticOut,
+      curve: Curves.easeOut,
     ));
 
     _controller.forward().then((_) {

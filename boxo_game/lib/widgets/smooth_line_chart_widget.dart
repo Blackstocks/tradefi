@@ -6,12 +6,16 @@ class SmoothLineChartWidget extends StatelessWidget {
   final List<double> priceHistory;
   final double currentPrice;
   final List<Map<String, dynamic>> placedBoxes;
+  final List<double> priceLevels;
+  final int selectedPriceLevel;
 
   const SmoothLineChartWidget({
     super.key,
     required this.priceHistory,
     required this.currentPrice,
     required this.placedBoxes,
+    this.priceLevels = const [],
+    this.selectedPriceLevel = 2,
   });
 
   @override
@@ -21,6 +25,8 @@ class SmoothLineChartWidget extends StatelessWidget {
         priceHistory: priceHistory,
         currentPrice: currentPrice,
         placedBoxes: placedBoxes,
+        priceLevels: priceLevels,
+        selectedPriceLevel: selectedPriceLevel,
       ),
       child: Container(),
     );
@@ -31,11 +37,15 @@ class SmoothLineChartPainter extends CustomPainter {
   final List<double> priceHistory;
   final double currentPrice;
   final List<Map<String, dynamic>> placedBoxes;
+  final List<double> priceLevels;
+  final int selectedPriceLevel;
 
   SmoothLineChartPainter({
     required this.priceHistory,
     required this.currentPrice,
     required this.placedBoxes,
+    required this.priceLevels,
+    required this.selectedPriceLevel,
   });
 
   @override
@@ -53,21 +63,29 @@ class SmoothLineChartPainter extends CustomPainter {
     maxPrice += priceRange * 0.1;
     priceRange = maxPrice - minPrice;
 
-    // Draw grid lines
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.05)
-      ..strokeWidth = 0.5;
-
-    // Horizontal grid lines
-    for (int i = 0; i <= 5; i++) {
-      final y = size.height * i / 5;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    // Vertical grid lines
-    for (int i = 0; i <= 8; i++) {
-      final x = size.width * i / 8;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    // Draw price level lines
+    if (priceLevels.isNotEmpty) {
+      for (int i = 0; i < priceLevels.length; i++) {
+        final levelPrice = priceLevels[i];
+        if (levelPrice >= minPrice && levelPrice <= maxPrice) {
+          final y = size.height - ((levelPrice - minPrice) / priceRange * size.height);
+          
+          final levelPaint = Paint()
+            ..color = i == selectedPriceLevel 
+              ? Colors.cyanAccent.withOpacity(0.3)
+              : Colors.white.withOpacity(0.1)
+            ..strokeWidth = i == selectedPriceLevel ? 2 : 1;
+          
+          // Dashed line
+          for (double x = 0; x < size.width; x += 10) {
+            canvas.drawLine(
+              Offset(x, y),
+              Offset(min(x + 5, size.width), y),
+              levelPaint,
+            );
+          }
+        }
+      }
     }
 
     // Draw smooth price line with gradient
@@ -158,40 +176,20 @@ class SmoothLineChartPainter extends CustomPainter {
       ..strokeWidth = 2;
     canvas.drawCircle(Offset(currentX, currentY), 5, dotBorderPaint);
 
-    // Draw current price label
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: '\$${currentPrice.toStringAsFixed(2)}',
-        style: const TextStyle(
-          color: Colors.cyanAccent,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          backgroundColor: Colors.black,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    
-    // Position label above the dot
-    textPainter.paint(
-      canvas, 
-      Offset(currentX - textPainter.width / 2, currentY - 30),
-    );
 
     // Draw placed boxes on the chart
     for (var box in placedBoxes) {
-      if (box['timestamp'] != null && box['price'] != null && (box['animated'] ?? false)) {
+      if (box['timestamp'] != null && box['price'] != null && (box['animated'] ?? false) && box['hit'] != true) {
         final boxTime = box['timestamp'] as int;
         final boxPrice = box['price'] as double;
         final currentTime = DateTime.now().millisecondsSinceEpoch;
-        final timeRange = 60000; // 60 seconds of history
+        final timeRange = 30000; // 30 seconds timeout
         
         // Calculate x position based on time
         final timeDiff = currentTime - boxTime;
         if (timeDiff <= timeRange) {
-          final progress = 1 - (timeDiff / timeRange);
-          final x = chartPadding + (chartWidth * progress);
+          // Keep box at fixed x position (right side of chart)
+          final x = chartPadding + chartWidth - 50;
           final y = size.height - ((boxPrice - minPrice) / priceRange * size.height);
           
           // Draw larger box marker with shadow

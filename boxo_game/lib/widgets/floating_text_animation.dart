@@ -4,7 +4,7 @@ class FloatingTextAnimation extends StatefulWidget {
   final String text;
   final Offset startPosition;
   final Color color;
-  final double fontSize;
+  final double? fontSize;
   final VoidCallback? onComplete;
 
   const FloatingTextAnimation({
@@ -12,7 +12,7 @@ class FloatingTextAnimation extends StatefulWidget {
     required this.text,
     required this.startPosition,
     this.color = Colors.yellowAccent,
-    this.fontSize = 24,
+    this.fontSize,
     this.onComplete,
   });
 
@@ -82,7 +82,7 @@ class _FloatingTextAnimationState extends State<FloatingTextAnimation>
                 widget.text,
                 style: TextStyle(
                   color: widget.color,
-                  fontSize: widget.fontSize,
+                  fontSize: widget.fontSize ?? 24,
                   fontWeight: FontWeight.bold,
                   shadows: [
                     Shadow(

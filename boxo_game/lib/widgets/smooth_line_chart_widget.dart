@@ -181,7 +181,7 @@ class SmoothLineChartPainter extends CustomPainter {
 
     // Draw placed boxes on the chart
     for (var box in placedBoxes) {
-      if (box['timestamp'] != null && box['price'] != null) {
+      if (box['timestamp'] != null && box['price'] != null && (box['animated'] ?? false)) {
         final boxTime = box['timestamp'] as int;
         final boxPrice = box['price'] as double;
         final currentTime = DateTime.now().millisecondsSinceEpoch;

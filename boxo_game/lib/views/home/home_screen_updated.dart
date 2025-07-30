@@ -9,6 +9,7 @@ import '../../widgets/bonus_progress_bar.dart';
 import '../../widgets/floating_text_animation.dart';
 import '../../widgets/particle_explosion.dart';
 import '../../widgets/game_result_overlay.dart';
+import '../../widgets/animated_box_placement.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double _bonusProgress = 0.47; // 47/125
   int _bonusCurrent = 47;
   int _bonusMax = 125;
-  double _multiplier = 2.0;
+  double _multiplier = 1.0;
   
   // Box price control
   double _boxPrice = 0.0001;
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _combo = 0;
   List<Widget> _floatingTexts = [];
   List<Widget> _particles = [];
+  List<Widget> _animatedBoxPlacements = [];
   bool _isProcessingMatch = false;
   Timer? _comboTimer;
   bool _gameOver = false;
@@ -152,26 +154,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final boxPosition = boxRenderBox.localToGlobal(Offset.zero);
     final boxSize = boxRenderBox.size;
 
-    setState(() {
-      // Check if this box matches with any existing selected boxes
-      bool foundMatch = false;
-      int matchIndex = -1;
-      
-      for (int i = 0; i < selectedBoxData.length; i++) {
-        if (selectedBoxData[i]['value'] == selectedBoxInfo['value']) {
-          foundMatch = true;
-          matchIndex = i;
-          break;
-        }
+    // Check if this box matches with any existing selected boxes
+    bool foundMatch = false;
+    int matchIndex = -1;
+    
+    for (int i = 0; i < selectedBoxData.length; i++) {
+      if (selectedBoxData[i]['value'] == selectedBoxInfo['value']) {
+        foundMatch = true;
+        matchIndex = i;
+        break;
       }
-      
-      if (foundMatch) {
-        // Process match
-        _processMatch(selectedBoxInfo, matchIndex, boxPosition);
-      } else {
-        // Normal selection - costs money to place box
-        final cost = double.parse(selectedBoxInfo['value']) * 10;
-        if (_balance >= cost) {
+    }
+    
+    if (foundMatch) {
+      // Process match
+      _processMatch(selectedBoxInfo, matchIndex, boxPosition);
+    } else {
+      // Normal selection - costs money to place box
+      final cost = double.parse(selectedBoxInfo['value']) * 10;
+      if (_balance >= cost) {
+        setState(() {
           _balance -= cost;
           
           if (selectedIndices.length >= maxCenterBoxes) {
@@ -182,16 +184,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
           selectedIndices.add(index);
           selectedBoxData.add(selectedBoxInfo);
-          
-          // Show cost
-          _showFloatingText('-\$${cost.toStringAsFixed(0)}', boxPosition, Colors.redAccent);
-        } else {
-          // Not enough balance
-          _showFloatingText('Not enough balance!', boxPosition, Colors.red);
-          return;
-        }
+        });
+        
+        // Calculate chart position for animation
+        _animateBoxToChart(selectedBoxInfo, boxPosition);
+        
+        // Show cost
+        _showFloatingText('-\$${cost.toStringAsFixed(0)}', boxPosition, Colors.redAccent);
+      } else {
+        // Not enough balance
+        _showFloatingText('Not enough balance!', boxPosition, Colors.red);
+        return;
       }
+    }
 
+    setState(() {
       // Replace tapped grid box with new one
       boxData[index] = generateRandomBox();
     });
@@ -305,6 +312,67 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }
         }
       }
+    });
+  }
+  
+  void _animateBoxToChart(Map<String, dynamic> boxInfo, Offset startPosition) {
+    // Calculate the end position on the chart
+    final screenSize = MediaQuery.of(context).size;
+    final chartAreaHeight = screenSize.height * 0.6; // 60% of screen for chart
+    final headerHeight = 80.0; // Header height
+    final bonusBarHeight = 50.0; // Bonus bar height
+    final chartPadding = 20.0; // Chart padding
+    
+    final price = boxInfo['price'] as double;
+    
+    // Get price range from current price history
+    double minPrice = _priceHistory.reduce((a, b) => a < b ? a : b);
+    double maxPrice = _priceHistory.reduce((a, b) => a > b ? a : b);
+    double priceRange = maxPrice - minPrice;
+    if (priceRange == 0) priceRange = 1;
+    
+    // Add padding to price range (same as in chart)
+    minPrice -= priceRange * 0.1;
+    maxPrice += priceRange * 0.1;
+    priceRange = maxPrice - minPrice;
+    
+    // Calculate Y position (inverted because chart draws from bottom)
+    final normalizedPrice = (price - minPrice) / priceRange;
+    final chartHeight = chartAreaHeight - headerHeight - bonusBarHeight - (chartPadding * 2);
+    final chartY = headerHeight + bonusBarHeight + chartPadding + 
+                   (chartHeight - (normalizedPrice * chartHeight));
+    
+    // X position at the right side of chart (with padding)
+    final chartWidth = screenSize.width - (chartPadding * 2);
+    final chartX = chartPadding + (chartWidth * 0.9); // 90% to the right
+    
+    final endPosition = Offset(chartX, chartY);
+    
+    // Create animated box
+    final key = GlobalKey();
+    final animatedBox = AnimatedBoxPlacement(
+      key: key,
+      value: boxInfo['value'],
+      color: boxInfo['color'],
+      startPosition: startPosition,
+      endPosition: endPosition,
+      onComplete: () {
+        setState(() {
+          _animatedBoxPlacements.removeWhere((widget) => widget.key == key);
+          // Mark the box as animated so it appears on the chart
+          for (var i = 0; i < selectedBoxData.length; i++) {
+            if (selectedBoxData[i]['value'] == boxInfo['value'] && 
+                selectedBoxData[i]['price'] == boxInfo['price']) {
+              selectedBoxData[i]['animated'] = true;
+              break;
+            }
+          }
+        });
+      },
+    );
+    
+    setState(() {
+      _animatedBoxPlacements.add(animatedBox);
     });
   }
   
@@ -516,19 +584,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       
                       
-                      // Gold coins animation points
-                      ...List.generate(5, (index) {
-                        final random = Random();
-                        return Positioned(
-                          top: 100 + random.nextDouble() * 200,
-                          right: 50 + random.nextDouble() * 100,
-                          child: Icon(
-                            Icons.monetization_on,
-                            color: Colors.yellowAccent.withOpacity(0.7),
-                            size: 20,
-                          ),
-                        );
-                      }),
                     ],
                   ),
                 ),
@@ -681,6 +736,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             // Particle effects
             ..._particles,
+            
+            // Animated box placements
+            ..._animatedBoxPlacements,
             
             // Floating text animations
             ..._floatingTexts,

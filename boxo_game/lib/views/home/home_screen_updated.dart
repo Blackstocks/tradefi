@@ -582,8 +582,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             
             // Box price control - transparent, left corner, middle of screen
             Positioned(
-              bottom: MediaQuery.of(context).size.height * 0.4 + 10,
-              left: 20,
+              bottom: MediaQuery.of(context).size.height * 0.4 - 20,
+              left: 10,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(

@@ -3,11 +3,12 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../../widgets/candlestick_chart_widget.dart';
+import '../../widgets/smooth_line_chart_widget.dart';
 import '../../widgets/box_3d_widget.dart';
 import '../../widgets/bonus_progress_bar.dart';
 import '../../widgets/floating_text_animation.dart';
 import '../../widgets/particle_explosion.dart';
+import '../../widgets/game_result_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,9 +30,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Trading related variables
   Timer? _priceTimer;
   double _currentPrice = 100.0;
-  List<CandleData> _candles = [];
-  final int _maxCandles = 30;
-  double _lastPrice = 100.0;
+  List<double> _priceHistory = [];
+  final int _maxPriceHistory = 60; // 60 points for smooth line
   
   // Game state
   double _balance = 9440.4;
@@ -51,6 +51,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<Widget> _particles = [];
   bool _isProcessingMatch = false;
   Timer? _comboTimer;
+  bool _gameOver = false;
+  double _initialBalance = 9440.4;
+  double _targetScore = 10000.0;
 
   // Generate a single random box with new color scheme
   Map<String, dynamic> generateRandomBox() {
@@ -80,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    const int count = 54;
+    const int count = 54; // 9 columns x 6 rows
     boxKeys = List.generate(count, (index) => GlobalKey());
     _animationControllers = List.generate(count, (index) => AnimationController(
       duration: const Duration(milliseconds: 400),
@@ -96,8 +99,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     boxData = List.generate(count, (index) => generateRandomBox());
     
-    // Initialize candles
-    _initializeCandles();
+    // Initialize price history
+    _priceHistory = List.generate(_maxPriceHistory, (index) => _currentPrice);
     
     // Start price updates
     _startPriceUpdates();
@@ -113,53 +116,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
   
-  void _initializeCandles() {
-    final now = DateTime.now();
-    for (int i = _maxCandles; i > 0; i--) {
-      final time = now.subtract(Duration(seconds: i));
-      _candles.add(CandleData(
-        open: _currentPrice,
-        close: _currentPrice,
-        high: _currentPrice + 0.5,
-        low: _currentPrice - 0.5,
-        time: time,
-      ));
-    }
-  }
-  
   void _startPriceUpdates() {
-    _priceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _priceTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       setState(() {
-        // Generate realistic price movement
+        // Generate smooth price movement
         final random = Random();
         final change = (random.nextDouble() - 0.5) * 2;
-        final volatility = 0.5;
+        final volatility = 0.3; // Reduced for smoother movement
         
-        _lastPrice = _currentPrice;
         _currentPrice = _currentPrice * (1 + change * volatility / 100);
-        _currentPrice = _currentPrice.clamp(50.0, 200.0);
+        _currentPrice = _currentPrice.clamp(80.0, 120.0); // Tighter range for better visualization
         
-        // Create new candle
-        final high = max(_lastPrice, _currentPrice) + random.nextDouble() * 0.5;
-        final low = min(_lastPrice, _currentPrice) - random.nextDouble() * 0.5;
-        
-        _candles.add(CandleData(
-          open: _lastPrice,
-          close: _currentPrice,
-          high: high,
-          low: low,
-          time: DateTime.now(),
-        ));
-        
-        if (_candles.length > _maxCandles) {
-          _candles.removeAt(0);
+        // Update price history
+        _priceHistory.add(_currentPrice);
+        if (_priceHistory.length > _maxPriceHistory) {
+          _priceHistory.removeAt(0);
         }
+        
+        // Check win/lose conditions
+        _checkGameStatus();
       });
     });
   }
 
   void _onBoxTapped(int index) {
-    if (selectedIndices.contains(index) || _isProcessingMatch) return;
+    if (selectedIndices.contains(index) || _isProcessingMatch || _gameOver) return;
 
     final selectedBoxInfo = Map<String, dynamic>.from(boxData[index]);
     selectedBoxInfo['price'] = _currentPrice;
@@ -326,6 +307,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
   }
+  
+  void _checkGameStatus() {
+    // Win condition: reach target score
+    if (_score >= _targetScore && !_gameOver) {
+      setState(() {
+        _gameOver = true;
+      });
+      _showGameResult(true);
+    }
+    
+    // Lose condition: balance below 0
+    if (_balance <= 0 && !_gameOver) {
+      setState(() {
+        _gameOver = true;
+      });
+      _showGameResult(false);
+    }
+  }
+  
+  void _showGameResult(bool isWin) {
+    final profit = _balance - _initialBalance;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => GameResultOverlay(
+        isWin: isWin,
+        score: _score,
+        profit: profit,
+        onPlayAgain: () {
+          Navigator.of(context).pop();
+          _resetGame();
+        },
+      ),
+    );
+  }
+  
+  void _resetGame() {
+    setState(() {
+      _gameOver = false;
+      _score = 4949.6;
+      _balance = _initialBalance;
+      _combo = 0;
+      _multiplier = 1.0;
+      _bonusCurrent = 47;
+      _bonusProgress = _bonusCurrent / _bonusMax;
+      selectedIndices.clear();
+      selectedBoxData.clear();
+      _floatingTexts.clear();
+      _particles.clear();
+      
+      // Reset all animations
+      for (var controller in _animationControllers) {
+        controller.reset();
+      }
+      
+      // Generate new boxes
+      boxData = List.generate(54, (index) => generateRandomBox());
+    });
+  }
 
   Widget _buildBox(int index) {
     final item = boxData[index];
@@ -423,16 +463,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // Chart and game area
+                // Chart and game area (60%)
                 Expanded(
                   flex: 6,
                   child: Stack(
                     children: [
-                      // Candlestick chart background
+                      // Smooth line chart background
                       Padding(
                         padding: const EdgeInsets.all(20),
-                        child: CandlestickChartWidget(
-                          candles: _candles,
+                        child: SmoothLineChartWidget(
+                          priceHistory: _priceHistory,
                           currentPrice: _currentPrice,
                           placedBoxes: selectedBoxData,
                         ),
@@ -475,29 +515,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                       
-                      // Stacked boxes in center
-                      if (selectedBoxData.isNotEmpty)
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 80),
-                              ...selectedBoxData.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final data = entry.value;
-                                return Transform.translate(
-                                  offset: Offset(0, -index * 10.0),
-                                  child: Box3DWidget(
-                                    value: data['value'],
-                                    color: data['color'],
-                                    width: 80,
-                                    height: 80,
-                                  ),
-                                );
-                              }).toList(),
-                            ],
-                          ),
-                        ),
                       
                       // Gold coins animation points
                       ...List.generate(5, (index) {
@@ -531,20 +548,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.only(
+                        left: 8.0,
+                        right: 8.0,
+                        top: 8.0,
+                        bottom: 0, // No bottom padding
+                      ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          int columns = 9;
+                          const int columns = 9; // 9 columns
                           return GridView.builder(
                             key: gridKey,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: boxData.length,
                             padding: EdgeInsets.zero,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
-                              crossAxisSpacing: 4,
-                              mainAxisSpacing: 4,
-                              childAspectRatio: 1,
+                              crossAxisSpacing: 2,
+                              mainAxisSpacing: 2,
+                              childAspectRatio: 1, // Square boxes
                             ),
                             itemBuilder: (context, index) {
                               return _buildBox(index);
@@ -558,88 +580,100 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
             
-            // Bottom control panel
+            // Box price control - transparent, left corner, middle of screen
             Positioned(
               bottom: MediaQuery.of(context).size.height * 0.4 + 10,
               left: 20,
-              right: 20,
               child: Container(
-                padding: const EdgeInsets.all(15),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A3E),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+                  color: const Color(0xFF2A2A3E).withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
+                        Text(
                           'BOX PRICE',
                           style: TextStyle(
-                            color: Colors.white54,
+                            color: Colors.white.withOpacity(0.5),
                             fontSize: 10,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '\$${_boxPrice.toStringAsFixed(5)}',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A2E),
+                    const SizedBox(width: 20),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A2E).withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (_boxQuantity > 1) _boxQuantity--;
+                              });
+                            },
                             borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.remove,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 18,
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove, color: Colors.white54),
-                                onPressed: () {
-                                  setState(() {
-                                    if (_boxQuantity > 1) _boxQuantity--;
-                                  });
-                                },
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              _boxQuantity.toString(),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 15),
-                                child: Text(
-                                  _boxQuantity.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add, color: Colors.white54),
-                                onPressed: () {
-                                  setState(() {
-                                    _boxQuantity++;
-                                  });
-                                },
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _boxQuantity++;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.add,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

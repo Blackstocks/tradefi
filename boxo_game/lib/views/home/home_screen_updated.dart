@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Trading related variables
   final PriceService _priceService = PriceService();
   StreamSubscription<double>? _priceSubscription;
-  double _currentPrice = 100000.0; // Default Bitcoin price (updated)
+  double _currentPrice = 50000.0; // Will be updated with real price immediately
   List<double> _priceHistory = [];
   final int _maxPriceHistory = 30; // Shorter history for more visible movement
   String _currentSymbol = 'BTC-USD';
@@ -577,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     // Reset price based on symbol
                                     switch (newSymbol) {
                                       case 'BTC-USD':
-                                        _currentPrice = 100000.0;
+                                        _currentPrice = 118000.0; // Closer to real price
                                         break;
                                       case 'ETH-USD':
                                         _currentPrice = 3500.0;

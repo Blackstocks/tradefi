@@ -14,8 +14,8 @@ class PriceService {
   Stream<double> get priceStream => _priceController.stream;
   
   String _currentSymbol = 'BTC-USD';
-  double _lastPrice = 100000.0;
-  double _targetPrice = 100000.0;
+  double _lastPrice = 50000.0; // Will be updated immediately with real price
+  double _targetPrice = 50000.0;
   bool _isRealTimeData = false;
   Timer? _smoothUpdateTimer;
   Timer? _httpPollingTimer;
@@ -36,37 +36,41 @@ class PriceService {
     // Start smooth price updates (60 FPS)
     _startSmoothPriceUpdates();
     
-    // Try Finnhub first if API key is set
-    final finnhubApiKey = 'd25ifvhr01qns40f4d70'; // Your Finnhub API key
-    if (finnhubApiKey != 'YOUR_FINNHUB_API_KEY') {
-      _connectToFinnhub(symbol, finnhubApiKey);
-    } else {
-      // Try HTTP polling as immediate solution
-      print('\n📊 Using HTTP polling for real-time prices...');
-      print('ℹ️ To get WebSocket data, register at https://finnhub.io');
-      _startHttpPolling(symbol);
-    }
+    print('\n🔄 Connecting to price service for $symbol...');
+    
+    // Try WebSocket connections first for real 1-second data
+    print('\n🚀 Attempting real-time WebSocket connection...');
+    _connectToBinance(symbol); // Binance has free real-time WebSocket for crypto
   }
   
   void _startHttpPolling(String symbol) {
-    print('\n🌐 Starting HTTP price polling (1 update/second)...');
+    print('\n🌐 Starting HTTP price polling (1 update/5 seconds)...');
     
     _httpPollingTimer?.cancel();
-    _httpPollingTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
-      try {
-        // Map symbols to CoinGecko IDs
-        final symbolMap = {
-          'BTC-USD': 'bitcoin',
-          'ETH-USD': 'ethereum',
-          'SOL-USD': 'solana',
-          'ADA-USD': 'cardano',
-          'XRP-USD': 'ripple',
-          'DOGE-USD': 'dogecoin',
-          'MATIC-USD': 'matic-network'
-        };
-        
-        final coinId = symbolMap[symbol] ?? 'bitcoin';
-        print('📊 Fetching price for $coinId ($symbol)');
+    
+    // Fetch immediately
+    _fetchPrice(symbol);
+    
+    // Then poll every 5 seconds to avoid rate limits
+    _httpPollingTimer = Timer.periodic(Duration(seconds: 5), (timer) async {
+      _fetchPrice(symbol);
+    });
+  }
+  
+  Future<void> _fetchPrice(String symbol) async {
+    try {
+      // Map symbols to CoinGecko IDs
+      final symbolMap = {
+        'BTC-USD': 'bitcoin',
+        'ETH-USD': 'ethereum',
+        'SOL-USD': 'solana',
+        'ADA-USD': 'cardano',
+        'XRP-USD': 'ripple',
+        'DOGE-USD': 'dogecoin',
+        'MATIC-USD': 'matic-network'
+      };
+      
+      final coinId = symbolMap[symbol] ?? 'bitcoin';
         
         final response = await http.get(
           Uri.parse('https://api.coingecko.com/api/v3/simple/price?ids=$coinId&vs_currencies=usd'),
@@ -76,37 +80,44 @@ class PriceService {
           final data = json.decode(response.body);
           final price = data[coinId]['usd'].toDouble();
           
+          // Update initial price if it's the default
+          if (_lastPrice == 100000.0 && symbol == 'BTC-USD') {
+            _lastPrice = price;
+          }
+          
           _targetPrice = price;
           _isRealTimeData = true;
           
           final now = DateTime.now();
-          if (now.second % 2 == 0) { // Log every 2 seconds
-            print('🌐 $symbol: \$${price.toStringAsFixed(2)} @ ${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')} (HTTP)');
-          }
+          print('✅ $symbol: \$${price.toStringAsFixed(2)} @ ${now.hour}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')} (HTTP)');
+        } else {
+          print('❌ HTTP Error: ${response.statusCode}');
         }
-      } catch (e) {
-        // Fallback to simulated on error
-        if (_httpPollingTimer != null && _httpPollingTimer!.isActive) {
-          _httpPollingTimer!.cancel();
-          print('\n❌ HTTP polling failed: $e');
-          print('🔄 Using simulated prices...');
-          _startAggressiveSimulatedPrices();
-        }
-      }
-    });
+    } catch (e) {
+      print('❌ Error fetching price: $e');
+      // Don't cancel polling on single failures
+    }
   }
   
   void _startSmoothPriceUpdates() {
     _smoothUpdateTimer?.cancel();
     
-    // Update exactly when we get new price data (1 second intervals)
-    // No artificial interpolation - chart moves only with real data
-    _smoothUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      // Emit the exact target price when it changes
-      if (_targetPrice != _lastPrice) {
-        _lastPrice = _targetPrice;
-        _priceController.add(_lastPrice);
+    // Update more frequently for smoother animation
+    _smoothUpdateTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      // Smooth interpolation towards target price
+      if ((_targetPrice - _lastPrice).abs() > 0.01) {
+        final diff = _targetPrice - _lastPrice;
+        final step = diff * 0.2; // 20% of difference each update
+        _lastPrice += step;
+        
+        // Snap to target if very close
+        if (diff.abs() < 0.1) {
+          _lastPrice = _targetPrice;
+        }
       }
+      
+      // Always emit current price for continuous chart movement
+      _priceController.add(_lastPrice);
     });
   }
   
@@ -490,8 +501,8 @@ class PriceService {
     // Reset price to appropriate level for the new symbol
     switch (symbol) {
       case 'BTC-USD':
-        _lastPrice = 100000.0;
-        _targetPrice = 100000.0;
+        _lastPrice = 118000.0;
+        _targetPrice = 118000.0;
         break;
       case 'ETH-USD':
         _lastPrice = 3500.0;

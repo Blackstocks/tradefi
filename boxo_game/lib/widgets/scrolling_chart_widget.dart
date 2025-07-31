@@ -117,16 +117,14 @@ class ScrollingChartPainter extends CustomPainter {
     
     double priceRange = maxPrice - minPrice;
     
-    // For crypto, zoom in to show small movements
-    // If range is less than 0.5% of price, force it to show 0.5%
-    final minRange = currentPrice * 0.005; // 0.5% of current price
-    if (priceRange < minRange) {
-      // Center the range around current price
-      final center = (maxPrice + minPrice) / 2;
-      minPrice = center - minRange / 2;
-      maxPrice = center + minRange / 2;
-      priceRange = maxPrice - minPrice;
-    }
+    // For crypto, zoom in to show very small movements
+    // Force range to show only 0.01% of price for maximum sensitivity
+    final minRange = currentPrice * 0.0001; // 0.01% of current price
+    // Always use this tight range
+    final center = (maxPrice + minPrice) / 2;
+    minPrice = center - minRange / 2;
+    maxPrice = center + minRange / 2;
+    priceRange = maxPrice - minPrice;
 
     // Add padding for visual appeal
     minPrice -= priceRange * 0.1;

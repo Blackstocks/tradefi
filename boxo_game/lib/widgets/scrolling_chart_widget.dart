@@ -116,22 +116,70 @@ class ScrollingChartPainter extends CustomPainter {
     }
     
     double priceRange = maxPrice - minPrice;
-    if (priceRange < 3) priceRange = 3; // Minimum range for our scale
+    
+    // For crypto, zoom in to show small movements
+    // If range is less than 0.5% of price, force it to show 0.5%
+    final minRange = currentPrice * 0.005; // 0.5% of current price
+    if (priceRange < minRange) {
+      // Center the range around current price
+      final center = (maxPrice + minPrice) / 2;
+      minPrice = center - minRange / 2;
+      maxPrice = center + minRange / 2;
+      priceRange = maxPrice - minPrice;
+    }
 
-    // Add padding
-    minPrice -= priceRange * 0.2;
-    maxPrice += priceRange * 0.2;
+    // Add padding for visual appeal
+    minPrice -= priceRange * 0.1;
+    maxPrice += priceRange * 0.1;
     priceRange = maxPrice - minPrice;
 
     // Calculate vertical offset to keep current price at center
-    final currentPriceY = centerY;
+    // The current price is always at centerY, other prices move relative to it
     final priceToY = (double price) {
-      final normalized = (price - currentPrice) / priceRange;
-      // Use full height for maximum visual impact
-      return centerY - (normalized * size.height * 0.85);
+      // Calculate the difference from current price
+      final priceDiff = price - currentPrice;
+      // Scale the difference to pixels (adjust scale as needed)
+      final pixelsPerDollar = size.height * 0.8 / priceRange;
+      // Center Y minus the scaled difference (minus because Y increases downward)
+      return centerY - (priceDiff * pixelsPerDollar);
     };
 
-    // Clean background - no grid lines or labels
+    // Draw price scale on the right
+    final scalePaint = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..strokeWidth = 0.5;
+    
+    final textStyle = TextStyle(
+      color: Colors.white.withOpacity(0.5),
+      fontSize: 10,
+    );
+    
+    // Draw 5 price levels
+    for (int i = 0; i <= 4; i++) {
+      final price = minPrice + (priceRange * i / 4);
+      final y = priceToY(price);
+      
+      // Draw line
+      canvas.drawLine(
+        Offset(size.width - 50, y),
+        Offset(size.width - 45, y),
+        scalePaint,
+      );
+      
+      // Draw price text
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: '\$${price.toStringAsFixed(0)}',
+          style: textStyle,
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(size.width - 40, y - textPainter.height / 2),
+      );
+    }
 
     // Draw price line (shifted by current price to keep it centered)
     final path = Path();
@@ -167,13 +215,22 @@ class ScrollingChartPainter extends CustomPainter {
       }
     }
     
+    // Connect the last price to center (where current price always is)
+    if (priceHistory.isNotEmpty) {
+      final lastY = priceToY(priceHistory.last);
+      path.lineTo(centerX, lastY); // Horizontal to center
+      path.lineTo(centerX, centerY); // Vertical to center (current price position)
+    }
+    
     // Draw glow trail first
     canvas.drawPath(path, glowPaint);
     
     // Then draw the main line
     canvas.drawPath(path, linePaint);
 
-    // Draw 4-direction pointer/crosshair at center
+    // Draw 4-direction pointer/crosshair at center (current price is always centered)
+    final currentPriceY = centerY; // Current price is always at center
+    
     final pointerPaint = Paint()
       ..color = Colors.cyanAccent.withOpacity(0.6)
       ..strokeWidth = 2
@@ -189,56 +246,56 @@ class ScrollingChartPainter extends CustomPainter {
     const pointerLength = 20.0;
     const gap = 10.0; // Gap from center
     
-    // Draw crosshair lines with glow
+    // Draw crosshair lines with glow at current price position
     // Top line
     canvas.drawLine(
-      Offset(centerX, centerY - gap - pointerLength),
-      Offset(centerX, centerY - gap),
+      Offset(centerX, currentPriceY - gap - pointerLength),
+      Offset(centerX, currentPriceY - gap),
       pointerGlowPaint,
     );
     canvas.drawLine(
-      Offset(centerX, centerY - gap - pointerLength),
-      Offset(centerX, centerY - gap),
+      Offset(centerX, currentPriceY - gap - pointerLength),
+      Offset(centerX, currentPriceY - gap),
       pointerPaint,
     );
     
     // Bottom line
     canvas.drawLine(
-      Offset(centerX, centerY + gap),
-      Offset(centerX, centerY + gap + pointerLength),
+      Offset(centerX, currentPriceY + gap),
+      Offset(centerX, currentPriceY + gap + pointerLength),
       pointerGlowPaint,
     );
     canvas.drawLine(
-      Offset(centerX, centerY + gap),
-      Offset(centerX, centerY + gap + pointerLength),
+      Offset(centerX, currentPriceY + gap),
+      Offset(centerX, currentPriceY + gap + pointerLength),
       pointerPaint,
     );
     
     // Left line
     canvas.drawLine(
-      Offset(centerX - gap - pointerLength, centerY),
-      Offset(centerX - gap, centerY),
+      Offset(centerX - gap - pointerLength, currentPriceY),
+      Offset(centerX - gap, currentPriceY),
       pointerGlowPaint,
     );
     canvas.drawLine(
-      Offset(centerX - gap - pointerLength, centerY),
-      Offset(centerX - gap, centerY),
+      Offset(centerX - gap - pointerLength, currentPriceY),
+      Offset(centerX - gap, currentPriceY),
       pointerPaint,
     );
     
     // Right line
     canvas.drawLine(
-      Offset(centerX + gap, centerY),
-      Offset(centerX + gap + pointerLength, centerY),
+      Offset(centerX + gap, currentPriceY),
+      Offset(centerX + gap + pointerLength, currentPriceY),
       pointerGlowPaint,
     );
     canvas.drawLine(
-      Offset(centerX + gap, centerY),
-      Offset(centerX + gap + pointerLength, centerY),
+      Offset(centerX + gap, currentPriceY),
+      Offset(centerX + gap + pointerLength, currentPriceY),
       pointerPaint,
     );
     
-    // Draw corner brackets for style
+    // Draw corner brackets for style at current price position
     const bracketSize = 8.0;
     final bracketPaint = Paint()
       ..color = Colors.cyanAccent.withOpacity(0.4)
@@ -247,52 +304,52 @@ class ScrollingChartPainter extends CustomPainter {
     
     // Top-left bracket
     final tlPath = Path()
-      ..moveTo(centerX - gap - pointerLength, centerY - gap - pointerLength + bracketSize)
-      ..lineTo(centerX - gap - pointerLength, centerY - gap - pointerLength)
-      ..lineTo(centerX - gap - pointerLength + bracketSize, centerY - gap - pointerLength);
+      ..moveTo(centerX - gap - pointerLength, currentPriceY - gap - pointerLength + bracketSize)
+      ..lineTo(centerX - gap - pointerLength, currentPriceY - gap - pointerLength)
+      ..lineTo(centerX - gap - pointerLength + bracketSize, currentPriceY - gap - pointerLength);
     canvas.drawPath(tlPath, bracketPaint);
     
     // Top-right bracket
     final trPath = Path()
-      ..moveTo(centerX + gap + pointerLength - bracketSize, centerY - gap - pointerLength)
-      ..lineTo(centerX + gap + pointerLength, centerY - gap - pointerLength)
-      ..lineTo(centerX + gap + pointerLength, centerY - gap - pointerLength + bracketSize);
+      ..moveTo(centerX + gap + pointerLength - bracketSize, currentPriceY - gap - pointerLength)
+      ..lineTo(centerX + gap + pointerLength, currentPriceY - gap - pointerLength)
+      ..lineTo(centerX + gap + pointerLength, currentPriceY - gap - pointerLength + bracketSize);
     canvas.drawPath(trPath, bracketPaint);
     
     // Bottom-left bracket
     final blPath = Path()
-      ..moveTo(centerX - gap - pointerLength, centerY + gap + pointerLength - bracketSize)
-      ..lineTo(centerX - gap - pointerLength, centerY + gap + pointerLength)
-      ..lineTo(centerX - gap - pointerLength + bracketSize, centerY + gap + pointerLength);
+      ..moveTo(centerX - gap - pointerLength, currentPriceY + gap + pointerLength - bracketSize)
+      ..lineTo(centerX - gap - pointerLength, currentPriceY + gap + pointerLength)
+      ..lineTo(centerX - gap - pointerLength + bracketSize, currentPriceY + gap + pointerLength);
     canvas.drawPath(blPath, bracketPaint);
     
     // Bottom-right bracket
     final brPath = Path()
-      ..moveTo(centerX + gap + pointerLength - bracketSize, centerY + gap + pointerLength)
-      ..lineTo(centerX + gap + pointerLength, centerY + gap + pointerLength)
-      ..lineTo(centerX + gap + pointerLength, centerY + gap + pointerLength - bracketSize);
+      ..moveTo(centerX + gap + pointerLength - bracketSize, currentPriceY + gap + pointerLength)
+      ..lineTo(centerX + gap + pointerLength, currentPriceY + gap + pointerLength)
+      ..lineTo(centerX + gap + pointerLength, currentPriceY + gap + pointerLength - bracketSize);
     canvas.drawPath(brPath, bracketPaint);
 
-    // Draw glowing dot at center (fixed position)
+    // Draw glowing dot at current price position
     // Outer glow
     for (int i = 3; i > 0; i--) {
       final glowPaint = Paint()
         ..color = Colors.cyanAccent.withOpacity(0.2 / i)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(centerX, centerY), 8.0 * i, glowPaint);
+      canvas.drawCircle(Offset(centerX, currentPriceY), 8.0 * i, glowPaint);
     }
     
     // Inner dot
     final dotPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(centerX, centerY), 6, dotPaint);
+    canvas.drawCircle(Offset(centerX, currentPriceY), 6, dotPaint);
     
     final dotBorderPaint = Paint()
       ..color = Colors.cyanAccent
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
-    canvas.drawCircle(Offset(centerX, centerY), 6, dotBorderPaint);
+    canvas.drawCircle(Offset(centerX, currentPriceY), 6, dotBorderPaint);
 
     // Draw placed boxes
     final currentTime = DateTime.now().millisecondsSinceEpoch;
@@ -307,13 +364,21 @@ class ScrollingChartPainter extends CustomPainter {
         final secondsSincePlacement = timeDiff / 1000.0;
         
         // Box starts at right edge and moves left with time
-        // Chart scrolls at about 60 pixels per second (slower for better gameplay)
-        final scrollSpeed = 60.0; // pixels per second
+        // Chart scrolls at 30 pixels per second to match 1-second data updates
+        // This gives players more time to react and makes movement match real data
+        final scrollSpeed = 30.0; // pixels per second (matches 1 sec data intervals)
         final startX = size.width - 10; // Start just inside the right edge
         final x = startX - (secondsSincePlacement * scrollSpeed);
         
-        // Use the relative Y position directly
-        final y = screenY;
+        // Use the original Y position but adjust for price movements
+        // Calculate how much the view has shifted based on price changes
+        final priceAtPlacement = box['priceAtPlacement'] as double?;
+        final priceShift = priceAtPlacement != null 
+            ? (currentPrice - priceAtPlacement) / priceRange * size.height * 0.8
+            : 0.0;
+        
+        // Apply the shift to the original Y position
+        final y = screenY + priceShift;
         
         // Only process boxes that are still visible on screen
         if (x > -50 && x < size.width) { // Box is on screen
@@ -326,9 +391,8 @@ class ScrollingChartPainter extends CustomPainter {
           if (distanceFromCenter < 20 && box['checked'] != true && x > centerX - 20) {
             box['checked'] = true;
             
-            // Check if the price line height matches the box position at this moment
-            final priceLineY = priceToY(currentPrice); // Get current price line Y position
-            final verticalDistance = (y - priceLineY).abs();
+            // Check if the box is at center height (where current price line is)
+            final verticalDistance = (y - centerY).abs();
             final threshold = 20.0; // Vertical tolerance in pixels
             
             if (verticalDistance <= threshold) {

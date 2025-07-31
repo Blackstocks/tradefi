@@ -11,6 +11,7 @@ import '../../widgets/particle_explosion.dart';
 import '../../widgets/game_result_overlay.dart';
 import '../../widgets/animated_box_placement.dart';
 import '../../widgets/chart_background_effects.dart';
+import '../../services/price_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,17 +30,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<GlobalKey> boxKeys = [];
   
   // Trading related variables
-  Timer? _priceTimer;
-  double _currentPrice = 100.0;
+  final PriceService _priceService = PriceService();
+  StreamSubscription<double>? _priceSubscription;
+  double _currentPrice = 100000.0; // Default Bitcoin price (updated)
   List<double> _priceHistory = [];
-  final int _maxPriceHistory = 15; // Much fewer points for very wide X steps
-  
-  // Square wave pattern variables
-  int _holdCounter = 0;
-  int _holdDuration = 2; // Hold for 2 ticks (0.2 seconds)
-  double _targetPrice = 100.0;
-  List<double> _priceTargets = [98.5, 99.0, 99.5, 100.0, 100.5, 101.0, 101.5]; // Possible price levels
-  int _lastPriceIndex = 3; // Start at middle (100.0)
+  final int _maxPriceHistory = 30; // Shorter history for more visible movement
+  String _currentSymbol = 'BTC-USD';
   
   // Game state
   double _balance = 9440.4;
@@ -55,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   
   // Price levels for placement
   List<double> _priceLevels = [];
-  int _selectedPriceLevel = 2; // Default to middle (current price)
+  int _selectedPriceLevel = 3; // Default to middle (current price)
   
   // Game mechanics
   int _combo = 0;
@@ -94,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    const int count = 100; // More boxes for better gameplay
+    const int count = 13; // Exactly 13 boxes
     boxKeys = List.generate(count, (index) => GlobalKey());
     _animationControllers = List.generate(count, (index) => AnimationController(
       duration: const Duration(milliseconds: 100), // Very fast animation
@@ -110,26 +106,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     boxData = List.generate(count, (index) => generateRandomBox());
     
-    // Initialize price history with random movement
-    final random = Random();
-    _priceHistory = [];
-    double lastPrice = _currentPrice;
+    // Initialize with some default price history
+    _priceHistory = List<double>.from(List.generate(_maxPriceHistory, (index) => _currentPrice));
     
-    for (int i = 0; i < _maxPriceHistory; i++) {
-      if (i % 3 == 0 && i > 0) {
-        // Jump to random level every 3 points
-        lastPrice = _priceTargets[random.nextInt(_priceTargets.length)];
-      }
-      _priceHistory.add(lastPrice);
-    }
+    // Connect to real-time price data
+    _priceService.connect(symbol: _currentSymbol);
     
-    // Start price updates
-    _startPriceUpdates();
+    // Subscribe to price updates
+    _priceSubscription = _priceService.priceStream.listen((price) {
+      setState(() {
+        _currentPrice = price;
+        _priceHistory.add(price);
+        if (_priceHistory.length > _maxPriceHistory) {
+          _priceHistory.removeAt(0);
+        }
+        
+        // Update price levels based on current price
+        _updatePriceLevels();
+        
+        // Check for price hits
+        _checkPriceHits();
+        
+        // Check box timeouts
+        _checkBoxTimeouts();
+        
+        // Check game status
+        _checkGameStatus();
+      });
+    });
   }
 
   @override
   void dispose() {
-    _priceTimer?.cancel();
+    _priceSubscription?.cancel();
+    _priceService.dispose();
     _comboTimer?.cancel();
     for (var controller in _animationControllers) {
       controller.dispose();
@@ -137,66 +147,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
   
-  void _startPriceUpdates() {
-    _priceTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      setState(() {
-        // Square wave pattern
-        if (_holdCounter >= _holdDuration) {
-          // Time to jump to a new level
-          final random = Random();
-          
-          // Create dummy data to fill entire height - pick random jumps
-          // Favor extreme values to use full range
-          List<int> possibleJumps = [-3, -2, -1, 1, 2, 3];
-          if (_lastPriceIndex <= 1) {
-            // Near bottom, favor upward jumps
-            possibleJumps = [1, 2, 3, 4, 5];
-          } else if (_lastPriceIndex >= 5) {
-            // Near top, favor downward jumps
-            possibleJumps = [-5, -4, -3, -2, -1];
-          }
-          
-          final jump = possibleJumps[random.nextInt(possibleJumps.length)];
-          _lastPriceIndex = (_lastPriceIndex + jump).clamp(0, 6);
-          
-          // Instant jump to new price
-          _currentPrice = _priceTargets[_lastPriceIndex];
-          _holdCounter = 0;
-          
-          // Randomize next hold duration (1-3 ticks)
-          _holdDuration = random.nextInt(3) + 1;
-        } else {
-          // Hold at current level
-          _holdCounter++;
-        }
-        
-        // Update price history
-        _priceHistory.add(_currentPrice);
-        if (_priceHistory.length > _maxPriceHistory) {
-          _priceHistory.removeAt(0);
-        }
-        
-        // Update price levels (7 levels)
-        _priceLevels = [
-          _currentPrice - 1.5,  // -1.5
-          _currentPrice - 1.0,  // -1
-          _currentPrice - 0.5,  // -0.5
-          _currentPrice,        // 0
-          _currentPrice + 0.5,  // +0.5
-          _currentPrice + 1.0,  // +1
-          _currentPrice + 1.5,  // +1.5
-        ];
-        
-        // Check for price hits on placed boxes
-        _checkPriceHits();
-        
-        // Check box timeouts
-        _checkBoxTimeouts();
-        
-        // Check win/lose conditions
-        _checkGameStatus();
-      });
-    });
+  void _updatePriceLevels() {
+    // Update price levels based on current price
+    // For crypto prices, use percentage-based levels
+    final levelSpacing = _currentPrice * 0.001; // 0.1% spacing
+    _priceLevels = [
+      _currentPrice - (levelSpacing * 3),  // -0.3%
+      _currentPrice - (levelSpacing * 2),  // -0.2%
+      _currentPrice - levelSpacing,        // -0.1%
+      _currentPrice,                       // Current price
+      _currentPrice + levelSpacing,        // +0.1%
+      _currentPrice + (levelSpacing * 2),  // +0.2%
+      _currentPrice + (levelSpacing * 3),  // +0.3%
+    ];
+  }
+
+  double _getPriceRange() {
+    if (_priceHistory.isEmpty) return 1.0;
+    final minPrice = _priceHistory.reduce((a, b) => a < b ? a : b);
+    final maxPrice = _priceHistory.reduce((a, b) => a > b ? a : b);
+    var range = maxPrice - minPrice;
+    if (range == 0) range = _currentPrice * 0.005; // 0.5% of current price
+    return range;
   }
 
   void _onBoxTapped(int index) {
@@ -224,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     selectedBoxInfo['screenY'] = boxCenterY - chartY - 20.0; // 20 is chart padding
     selectedBoxInfo['timestamp'] = DateTime.now().millisecondsSinceEpoch;
     selectedBoxInfo['animated'] = true;
+    selectedBoxInfo['priceAtPlacement'] = _currentPrice; // Store current price when box is placed
     
     // Single setState for all changes
     setState(() {
@@ -235,12 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       boxData[index] = generateRandomBox();
     });
     
-    // Effects after state update (truly non-blocking)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _showFloatingText('-\$${cost.toStringAsFixed(0)}', boxPosition, Colors.redAccent);
-      }
-    });
+    // No need to show deduction amount
   }
   
   
@@ -341,11 +309,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _multiplier = 1.0;
         });
         
-        // Show miss feedback at the left edge
-        final screenSize = MediaQuery.of(context).size;
-        final leftEdgeX = 50.0; // Near left edge
-        final centerY = screenSize.height * 0.5;
-        final position = Offset(leftEdgeX, centerY);
+        // Show miss feedback at bottom left, above box price control
+        // Box price control is at bottom: 20, with padding: 12, so total height ~60px
+        // Place text above that
+        final leftX = 40.0; // Left side position
+        final bottomY = MediaQuery.of(context).size.height * 0.85 - 150.0; // Moved higher up
+        final position = Offset(leftX, bottomY);
         
         _showFloatingText('MISS!', position, Colors.redAccent, fontSize: 14);
         
@@ -355,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _balance -= penalty;
         });
         _showFloatingText('-\$${penalty.toStringAsFixed(0)}', 
-          Offset(leftEdgeX, centerY + 20), Colors.redAccent.withOpacity(0.7), fontSize: 12);
+          Offset(leftX, bottomY + 20), Colors.redAccent.withOpacity(0.7), fontSize: 12);
       }
       
       // Remove boxes that have scrolled off screen or are marked as offScreen
@@ -464,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       
       // Generate new boxes
-      boxData = List.generate(100, (index) => generateRandomBox());
+      boxData = List.generate(13, (index) => generateRandomBox());
     });
   }
 
@@ -556,6 +525,137 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     maxValue: _bonusMax.toString(),
                   ),
                   
+                  // Symbol selector
+                  Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'SYMBOL:',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: DropdownButton<String>(
+                              value: _currentSymbol,
+                              dropdownColor: const Color(0xFF1A1A2E),
+                              underline: Container(),
+                              icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              isDense: true,
+                              isExpanded: true,
+                              items: PriceService.getAvailableSymbols().map((symbol) {
+                                return DropdownMenuItem<String>(
+                                  value: symbol['symbol'],
+                                  child: Text(symbol['name']!),
+                                );
+                              }).toList(),
+                              onChanged: (String? newSymbol) {
+                                if (newSymbol != null && newSymbol != _currentSymbol) {
+                                  setState(() {
+                                    _currentSymbol = newSymbol;
+                                    
+                                    // Reset price based on symbol
+                                    switch (newSymbol) {
+                                      case 'BTC-USD':
+                                        _currentPrice = 100000.0;
+                                        break;
+                                      case 'ETH-USD':
+                                        _currentPrice = 3500.0;
+                                        break;
+                                      case 'SOL-USD':
+                                        _currentPrice = 150.0;
+                                        break;
+                                      case 'ADA-USD':
+                                        _currentPrice = 0.6;
+                                        break;
+                                      case 'XRP-USD':
+                                        _currentPrice = 0.6;
+                                        break;
+                                      case 'DOGE-USD':
+                                        _currentPrice = 0.08;
+                                        break;
+                                      case 'MATIC-USD':
+                                        _currentPrice = 0.8;
+                                        break;
+                                    }
+                                    
+                                    // Clear price history and reset with new price
+                                    _priceHistory.clear();
+                                    _priceHistory = List<double>.from(List.generate(_maxPriceHistory, (index) => _currentPrice));
+                                    
+                                    // Clear placed boxes
+                                    selectedBoxData.clear();
+                                    
+                                    // Change symbol in service
+                                    _priceService.changeSymbol(newSymbol);
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _priceService.isRealTimeData ? Icons.wifi : Icons.trending_up,
+                                color: _priceService.isRealTimeData ? Colors.greenAccent : Colors.orangeAccent,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '\$${_currentPrice.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        color: Colors.cyanAccent,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      _priceService.isRealTimeData ? 'Coinbase' : 'Simulated',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
                   // 85/15 split below bonus bar
                   Expanded(
                     child: Stack(
@@ -567,8 +667,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               flex: 85,
                               child: Stack(
                                 children: [
-                                  // Background effects
-                                  const ChartBackgroundEffects(),
+                                  // Background effects that move with price
+                                  ChartBackgroundEffects(
+                                    priceOffset: _priceHistory.isNotEmpty 
+                                        ? (_currentPrice - _priceHistory.first) / _currentPrice 
+                                        : 0.0,
+                                  ),
                                   
                                   // Smooth line chart background
                                   Padding(
@@ -708,21 +812,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ),
                           ),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 4.0,
-                              horizontal: 2.0,
-                            ),
-                            itemCount: boxData.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 2.0),
-                                child: SizedBox(
-                                  height: 50, // Fixed height for smaller boxes
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: List.generate(boxData.length, (index) {
+                              return Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4.0,
+                                    vertical: 1.0,
+                                  ),
                                   child: _buildBox(index),
                                 ),
                               );
-                            },
+                            }),
                           ),
                         ),
                             ),

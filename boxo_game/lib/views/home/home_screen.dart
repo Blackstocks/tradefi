@@ -36,9 +36,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Game state
   double _balance = 9440.4;
   double _score = 4949.6;
-  double _bonusProgress = 0.47; // 47/125
-  int _bonusCurrent = 47;
-  int _bonusMax = 125;
+  double _bonusProgress = 0.5; // 25/50
+  int _bonusCurrent = 25;
+  int _bonusMax = 50;
   double _multiplier = 2.0;
   
   // Box price control

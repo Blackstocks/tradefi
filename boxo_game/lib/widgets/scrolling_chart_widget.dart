@@ -8,6 +8,7 @@ class ScrollingChartWidget extends StatelessWidget {
   final List<Map<String, dynamic>> placedBoxes;
   final List<double> priceLevels;
   final int selectedPriceLevel;
+  final double chartTopOffset;
 
   const ScrollingChartWidget({
     super.key,
@@ -16,6 +17,7 @@ class ScrollingChartWidget extends StatelessWidget {
     required this.placedBoxes,
     this.priceLevels = const [],
     this.selectedPriceLevel = 2,
+    this.chartTopOffset = 0.0,
   });
 
   @override
@@ -27,6 +29,7 @@ class ScrollingChartWidget extends StatelessWidget {
         placedBoxes: placedBoxes,
         priceLevels: priceLevels,
         selectedPriceLevel: selectedPriceLevel,
+        chartTopOffset: chartTopOffset,
       ),
       child: Container(),
     );
@@ -39,6 +42,7 @@ class ScrollingChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> placedBoxes;
   final List<double> priceLevels;
   final int selectedPriceLevel;
+  final double chartTopOffset;
 
   ScrollingChartPainter({
     required this.priceHistory,
@@ -46,6 +50,7 @@ class ScrollingChartPainter extends CustomPainter {
     required this.placedBoxes,
     required this.priceLevels,
     required this.selectedPriceLevel,
+    required this.chartTopOffset,
   });
 
   @override
@@ -293,27 +298,60 @@ class ScrollingChartPainter extends CustomPainter {
     final currentTime = DateTime.now().millisecondsSinceEpoch;
     
     for (var box in placedBoxes) {
-      if (box['animated'] == true && box['hit'] != true && box['timestamp'] != null) {
+      if (box['animated'] == true && box['timestamp'] != null) {
         final boxTime = box['timestamp'] as int;
-        final boxPrice = box['price'] as double;
-        final placeTime = 3000; // Box placed 3 seconds ahead
+        final screenY = box['screenY'] as double? ?? centerY;
         
-        // Calculate x position based on time
+        // Calculate time since placement
         final timeDiff = currentTime - boxTime;
-        final progress = timeDiff / placeTime; // 0 to 1 as box moves from right to center
+        final secondsSincePlacement = timeDiff / 1000.0;
         
-        if (progress >= 0 && progress <= 2) { // Show for 6 seconds total
-          final x = centerX + (size.width - centerX) * (1 - progress);
-          final y = priceToY(boxPrice);
+        // Box starts at right edge and moves left with time
+        // Chart scrolls at about 60 pixels per second (slower for better gameplay)
+        final scrollSpeed = 60.0; // pixels per second
+        final startX = size.width - 10; // Start just inside the right edge
+        final x = startX - (secondsSincePlacement * scrollSpeed);
+        
+        // Use the relative Y position directly
+        final y = screenY;
+        
+        // Only process boxes that are still visible on screen
+        if (x > -50 && x < size.width) { // Box is on screen
           
+          // Check for hit when box passes through the center (where price line is)
+          // The price line is always at centerX
+          final distanceFromCenter = (x - centerX).abs();
+          
+          // Check for hit when passing through center
+          if (distanceFromCenter < 20 && box['checked'] != true && x > centerX - 20) {
+            box['checked'] = true;
+            
+            // Check if the price line height matches the box position at this moment
+            final priceLineY = priceToY(currentPrice); // Get current price line Y position
+            final verticalDistance = (y - priceLineY).abs();
+            final threshold = 20.0; // Vertical tolerance in pixels
+            
+            if (verticalDistance <= threshold) {
+              box['hit'] = true;
+              box['atCenter'] = true; // Trigger reward in checkPriceHits
+            }
+            // Don't mark as missed here - wait until it reaches the left edge
+          }
+          
+          // Check for miss only when box reaches the left edge
+          if (x < 50 && box['hit'] != true && box['missed'] != true) {
+            box['missed'] = true;
+          }
+          
+          // Only draw if box is within vertical bounds
           if (y >= 0 && y <= size.height) {
             // Draw box
             final boxPaint = Paint()
-              ..color = (box['color'] as Color).withOpacity(0.9)
+              ..color = (box['color'] as Color).withOpacity((box['missed'] ?? false) == true ? 0.3 : 0.9)
               ..style = PaintingStyle.fill;
             
             final rect = RRect.fromRectAndRadius(
-              Rect.fromCenter(center: Offset(x, y), width: 45, height: 35),
+              Rect.fromCenter(center: Offset(x, y), width: 50, height: 40),
               const Radius.circular(8),
             );
             
@@ -323,7 +361,7 @@ class ScrollingChartPainter extends CustomPainter {
               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
             canvas.drawRRect(
               RRect.fromRectAndRadius(
-                Rect.fromCenter(center: Offset(x + 2, y + 2), width: 45, height: 35),
+                Rect.fromCenter(center: Offset(x + 2, y + 2), width: 50, height: 40),
                 const Radius.circular(8),
               ),
               shadowPaint,
@@ -331,12 +369,46 @@ class ScrollingChartPainter extends CustomPainter {
             
             canvas.drawRRect(rect, boxPaint);
             
+            // Draw border for hit/miss feedback
+            if ((box['hit'] ?? false) == true) {
+              final hitBorderPaint = Paint()
+                ..color = Colors.greenAccent
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 3;
+              canvas.drawRRect(rect, hitBorderPaint);
+              
+              // Draw checkmark for hit
+              final checkPaint = Paint()
+                ..color = Colors.greenAccent
+                ..strokeWidth = 3
+                ..style = PaintingStyle.stroke;
+              final path = Path();
+              path.moveTo(x - 12, y);
+              path.lineTo(x - 4, y + 8);
+              path.lineTo(x + 12, y - 8);
+              canvas.drawPath(path, checkPaint);
+            } else if ((box['missed'] ?? false) == true) {
+              final missBorderPaint = Paint()
+                ..color = Colors.redAccent.withOpacity(0.8)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2;
+              canvas.drawRRect(rect, missBorderPaint);
+              
+              // Draw X for missed box
+              final xPaint = Paint()
+                ..color = Colors.redAccent
+                ..strokeWidth = 3
+                ..style = PaintingStyle.stroke;
+              canvas.drawLine(Offset(x - 12, y - 10), Offset(x + 12, y + 10), xPaint);
+              canvas.drawLine(Offset(x - 12, y + 10), Offset(x + 12, y - 10), xPaint);
+            }
+            
             // Draw value
             final textPainter = TextPainter(
               text: TextSpan(
                 text: box['value'] as String,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: (box['missed'] ?? false) == true ? Colors.white.withOpacity(0.5) : Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -348,12 +420,10 @@ class ScrollingChartPainter extends CustomPainter {
               canvas,
               Offset(x - textPainter.width / 2, y - textPainter.height / 2),
             );
-            
-            // Check if box is at center (hit detection happens in the game logic)
-            if ((x - centerX).abs() < 10) {
-              box['atCenter'] = true;
-            }
           }
+        } else if (x < -50) {
+          // Box has scrolled off the left side - mark for removal
+          box['offScreen'] = true;
         }
       }
     }

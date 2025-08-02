@@ -43,7 +43,7 @@ class BonusProgressBar extends StatelessWidget {
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           height: 8,
                           decoration: BoxDecoration(
-                            color: isActive ? Colors.greenAccent : Colors.white.withOpacity(0.2),
+                            color: isActive ? Colors.amber : Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -60,7 +60,7 @@ class BonusProgressBar extends StatelessWidget {
               Text(
                 currentValue,
                 style: const TextStyle(
-                  color: Colors.greenAccent,
+                  color: Colors.amber,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),

@@ -11,6 +11,8 @@ import '../../widgets/particle_explosion.dart';
 import '../../widgets/game_result_overlay.dart';
 import '../../widgets/animated_box_placement.dart';
 import '../../widgets/chart_background_effects.dart';
+import '../../widgets/odometer_price_display.dart';
+import '../../widgets/simple_odometer_display.dart';
 import '../../services/price_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -38,10 +40,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _currentSymbol = 'BTC-USD';
   
   // Game state
-  double _balance = 9440.4;
-  double _score = 4949.6;
-  double _bonusProgress = 0.5; // 25/50
-  int _bonusCurrent = 25;
+  double _balance = 100.0;
+  double _score = 0.0;
+  double _bonusProgress = 0.0; // 0/50
+  int _bonusCurrent = 0;
   int _bonusMax = 50;
   double _multiplier = 1.0;
   
@@ -59,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<Widget> _particles = [];
   Timer? _comboTimer;
   bool _gameOver = false;
-  double _initialBalance = 9440.4;
+  double _initialBalance = 100.0;
   double _targetScore = 10000.0;
 
   // Generate a single random box with new color scheme
@@ -207,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Replace box immediately
       boxData[index] = generateRandomBox();
     });
+    
     
     // No need to show deduction amount
   }
@@ -417,11 +420,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _resetGame() {
     setState(() {
       _gameOver = false;
-      _score = 4949.6;
+      _score = 0.0;
       _balance = _initialBalance;
       _combo = 0;
       _multiplier = 1.0;
-      _bonusCurrent = 25;
+      _bonusCurrent = 0;
       _bonusProgress = _bonusCurrent / _bonusMax;
       selectedBoxData.clear();
       _floatingTexts.clear();
@@ -481,12 +484,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         FittedBox(
-                          child: Text(_score.toStringAsFixed(1).replaceAll('.', ','),
-                              style: const TextStyle(
-                                color: CupertinoColors.activeGreen,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              )),
+                          child: SimpleOdometerDisplay(
+                            key: const ValueKey('score_odometer'),
+                            value: _score,
+                            decimalPlaces: 1,
+                            textStyle: const TextStyle(
+                              color: CupertinoColors.activeGreen,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         const Text('SCORE', style: TextStyle(color: Colors.white54, fontSize: 9)),
@@ -498,12 +505,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         FittedBox(
-                          child: Text(_balance.toStringAsFixed(1).replaceAll('.', ','),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              )),
+                          child: SimpleOdometerDisplay(
+                            key: const ValueKey('balance_odometer'),
+                            value: _balance,
+                            decimalPlaces: 1,
+                            textStyle: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         const Text('BALANCE', style: TextStyle(color: Colors.white54, fontSize: 9)),
@@ -523,6 +534,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     progress: _bonusProgress,
                     currentValue: _bonusCurrent.toString(),
                     maxValue: _bonusMax.toString(),
+                    totalDots: 25, // 25 dots for 50 points (2 points per dot)
                   ),
                   
                   // Symbol selector
@@ -540,7 +552,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Expanded(
+                        SizedBox(
+                          width: 150, // Fixed width for symbol dropdown
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
@@ -614,44 +627,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 15),
-                        Flexible(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _priceService.isRealTimeData ? Icons.wifi : Icons.trending_up,
-                                color: _priceService.isRealTimeData ? Colors.greenAccent : Colors.orangeAccent,
-                                size: 14,
+                        const SizedBox(width: 10),
+                        // Odometer price display - takes remaining space
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.cyanAccent.withOpacity(0.2),
+                                width: 1,
                               ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '\$${_currentPrice.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        color: Colors.cyanAccent,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      _priceService.isRealTimeData ? 'Coinbase' : 'Simulated',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.5),
-                                        fontSize: 9,
-                                      ),
-                                    ),
-                                  ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.cyanAccent.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: OdometerPriceDisplay(
+                                price: _currentPrice,
+                                textStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.cyanAccent,
+                                  fontFamily: 'monospace',
+                                  letterSpacing: 0,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 20),
                       ],
                     ),
                   ),

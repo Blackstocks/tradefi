@@ -150,7 +150,7 @@ export default function LightweightChart({ symbol, interval, indicators = ['volu
       
       // Set the last update time to the most recent candle
       if (candles.length > 0) {
-        lastUpdateTimeRef.current = candles[candles.length - 1].time
+        lastUpdateTimeRef.current = candles[candles.length - 1].time as number
       }
       
       setIsLoading(false)

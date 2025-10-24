@@ -106,8 +106,8 @@ export async function fetchBTCData(interval: string): Promise<{ candles: Candles
     }
     
     // Sort by time to ensure correct order
-    allCandles.sort((a, b) => a.time - b.time)
-    allVolumes.sort((a, b) => a.time - b.time)
+    allCandles.sort((a, b) => (a.time as number) - (b.time as number))
+    allVolumes.sort((a, b) => (a.time as number) - (b.time as number))
     
     console.log(`Fetched ${allCandles.length} candles for ${binanceInterval} timeframe (requested interval: ${interval})`)
     

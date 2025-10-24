@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout'
 import { GripVertical } from 'lucide-react'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
+import { DragContext } from './SafeDraggableChart'
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -14,133 +15,212 @@ interface DraggableLayoutProps {
     orderBook: React.ReactNode
     sidebar: React.ReactNode
     marketHeader: React.ReactNode
+    bottomPanel?: React.ReactNode
   }
 }
 
 export default function DraggableLayout({ children }: DraggableLayoutProps) {
-  // Define initial layouts for different breakpoints
-  const [layouts, setLayouts] = useState({
+  const [isDragging, setIsDragging] = useState(false)
+  
+  // Match the exact locked layout structure: 75% left (chart+orderbook), 25% right (sidebar)
+  const defaultLayouts = {
     lg: [
-      { i: 'market-header', x: 0, y: 0, w: 12, h: 1, static: true },
-      { i: 'chart', x: 0, y: 1, w: 6, h: 8 },
-      { i: 'orderbook', x: 6, y: 1, w: 3, h: 8 },
-      { i: 'sidebar', x: 9, y: 1, w: 3, h: 8 }
-    ],
-    md: [
-      { i: 'market-header', x: 0, y: 0, w: 10, h: 1, static: true },
-      { i: 'chart', x: 0, y: 1, w: 5, h: 8 },
-      { i: 'orderbook', x: 5, y: 1, w: 3, h: 8 },
-      { i: 'sidebar', x: 8, y: 1, w: 2, h: 8 }
-    ],
-    sm: [
-      { i: 'market-header', x: 0, y: 0, w: 6, h: 1, static: true },
-      { i: 'chart', x: 0, y: 1, w: 6, h: 6 },
-      { i: 'orderbook', x: 0, y: 7, w: 6, h: 4 },
-      { i: 'sidebar', x: 0, y: 11, w: 6, h: 4 }
+      // Market header spans only the left 75%
+      { i: 'market-header', x: 0, y: 0, w: 9, h: 1, static: false, minW: 6, maxW: 9 },
+      // Chart takes most of the left area
+      { i: 'chart', x: 0, y: 1, w: 6, h: 6, minW: 4, minH: 4 },
+      // Order book on the right of chart
+      { i: 'orderbook', x: 6, y: 1, w: 3, h: 6, minW: 2, minH: 4 },
+      // Sidebar takes the full right 25%
+      { i: 'sidebar', x: 9, y: 0, w: 3, h: 10, minW: 2, minH: 8 },
+      // Bottom panel under chart and orderbook only
+      { i: 'bottom-panel', x: 0, y: 7, w: 9, h: 3, minW: 6, minH: 2 }
     ]
+  }
+
+  // Load saved layouts or use defaults
+  const [layouts, setLayouts] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tradingLayouts')
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch (e) {
+          console.error('Failed to load saved layouts:', e)
+        }
+      }
+    }
+    return defaultLayouts
   })
 
   const handleLayoutChange = useCallback((currentLayout: any, allLayouts: any) => {
     setLayouts(allLayouts)
     // Save to localStorage for persistence
-    localStorage.setItem('tradingLayouts', JSON.stringify(allLayouts))
+    if (typeof window !== 'undefined' && !isDragging) {
+      localStorage.setItem('tradingLayouts', JSON.stringify(allLayouts))
+    }
+  }, [isDragging])
+
+  const handleDragStart = useCallback(() => {
+    console.log('Drag started')
+    setIsDragging(true)
   }, [])
+
+  const handleDragStop = useCallback(() => {
+    console.log('Drag stopped')
+    // Longer delay to ensure chart is fully disposed
+    setTimeout(() => {
+      setIsDragging(false)
+    }, 300)
+  }, [])
+
+  const handleResizeStart = useCallback(() => {
+    console.log('Resize started')
+    setIsDragging(true)
+  }, [])
+
+  const handleResizeStop = useCallback(() => {
+    console.log('Resize stopped')
+    setTimeout(() => {
+      setIsDragging(false)
+    }, 300)
+  }, [])
+
+  const resetLayout = () => {
+    setLayouts(defaultLayouts)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tradingLayouts')
+    }
+  }
 
   // Custom drag handle component
   const DragHandle = () => (
-    <div className="absolute top-0 left-0 w-full h-6 bg-black/50 opacity-0 hover:opacity-100 transition-opacity cursor-move flex items-center justify-center">
-      <GripVertical className="h-4 w-4 text-white/50" />
+    <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity cursor-move flex items-center justify-center z-10">
+      <div className="bg-gray-700 rounded-full p-1">
+        <GripVertical className="h-3 w-3 text-gray-400" />
+      </div>
     </div>
   )
 
   return (
-    <div className="h-full bg-black">
-      <style jsx global>{`
-        .react-grid-item {
-          transition: all 200ms ease;
-          transition-property: left, top;
-        }
-        .react-grid-item.cssTransforms {
-          transition-property: transform;
-        }
-        .react-grid-item.resizing {
-          z-index: 100;
-          will-change: width, height;
-        }
-        .react-grid-item.react-draggable-dragging {
-          transition: none;
-          z-index: 100;
-          will-change: transform;
-        }
-        .react-grid-item.dropping {
-          visibility: hidden;
-        }
-        .react-grid-item.react-grid-placeholder {
-          background: #ff6b00;
-          opacity: 0.2;
-          transition-duration: 100ms;
-          z-index: 2;
-          border-radius: 4px;
-        }
-        .react-resizable-handle {
-          position: absolute;
-          width: 20px;
-          height: 20px;
-          background-image: url('data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE2LjAuMCwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8IURPQ1RZUEUgc3ZnIFBVQkxJQyAiLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4iICJodHRwOi8vd3d3LnczLm9yZy9HcmFwaGljcy9TVkcvMS4xL0RURC9zdmcxMS5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHdpZHRoPSI2cHgiIGhlaWdodD0iNnB4IiB2aWV3Qm94PSIwIDAgNiA2IiBlbmFibGUtYmFja2dyb3VuZD0ibmV3IDAgMCA2IDYiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8ZyBvcGFjaXR5PSIwLjMwMiI+Cgk8cGF0aCBkPSJNNiw2SDBWNGg0djJINnoiLz4KCTxwYXRoIGQ9Ik02LDNIMFYwaDZ2M3oiLz4KPC9nPgo8L3N2Zz4K');
-          background-position: bottom right;
-          background-repeat: no-repeat;
-          background-origin: content-box;
-          box-sizing: border-box;
-          cursor: se-resize;
-        }
-        .react-resizable-handle-se {
-          bottom: 0;
-          right: 0;
-        }
-      `}</style>
+    <DragContext.Provider value={{ isDragging, setIsDragging }}>
+      <div className="h-full bg-black relative">
+        {/* Reset button */}
+        <button
+          onClick={resetLayout}
+          className="absolute top-2 right-32 z-50 px-3 py-1 bg-black border border-[#1a1a1a] rounded text-xs text-white hover:bg-[#0a0a0a] transition-colors"
+        >
+          Reset Layout
+        </button>
 
-      <ResponsiveGridLayout
-        className="layout"
-        layouts={layouts}
-        breakpoints={{ lg: 1200, md: 996, sm: 768 }}
-        cols={{ lg: 12, md: 10, sm: 6 }}
-        rowHeight={80}
-        onLayoutChange={handleLayoutChange}
-        draggableHandle=".drag-handle"
-        compactType={null}
-        preventCollision={true}
-      >
-        <div key="market-header" className="relative">
-          {children.marketHeader}
-        </div>
-        
-        <div key="chart" className="relative border border-[#1a1a1a] overflow-hidden">
-          <div className="drag-handle">
-            <DragHandle />
+        <style jsx global>{`
+          .react-grid-layout {
+            position: relative;
+          }
+          .react-grid-item {
+            transition: all 200ms ease;
+            transition-property: left, top, width, height;
+          }
+          .react-grid-item.cssTransforms {
+            transition-property: transform, width, height;
+          }
+          .react-grid-item.resizing {
+            z-index: 100;
+            will-change: width, height;
+          }
+          .react-grid-item.react-draggable-dragging {
+            transition: none;
+            z-index: 100;
+            will-change: transform;
+            opacity: 0.9;
+          }
+          .react-grid-item.dropping {
+            visibility: hidden;
+          }
+          .react-grid-item.react-grid-placeholder {
+            background: #ff6b00;
+            opacity: 0.2;
+            transition-duration: 100ms;
+            z-index: 2;
+            border-radius: 4px;
+          }
+          .react-resizable-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2IiBoZWlnaHQ9IjYiPjxwYXRoIGZpbGw9IiM2NjYiIGQ9Ik02IDZIMFY0LjVoNC41VjZINnpNNiAzSDBWMGg2djN6Ii8+PC9zdmc+');
+            background-position: bottom right;
+            background-repeat: no-repeat;
+            background-origin: content-box;
+            box-sizing: border-box;
+            cursor: se-resize;
+          }
+          .react-resizable-handle-se {
+            bottom: 0;
+            right: 0;
+          }
+        `}</style>
+
+        <ResponsiveGridLayout
+          className="layout h-full"
+          layouts={layouts}
+          breakpoints={{ lg: 1200 }}
+          cols={{ lg: 12 }}
+          rowHeight={60}
+          margin={[0, 0]}
+          containerPadding={[0, 0]}
+          onLayoutChange={handleLayoutChange}
+          onDragStart={handleDragStart}
+          onDragStop={handleDragStop}
+          onResizeStart={handleResizeStart}
+          onResizeStop={handleResizeStop}
+          draggableHandle=".drag-handle"
+          compactType={null}
+          preventCollision={false}
+          isResizable={true}
+          isDraggable={true}
+        >
+          <div key="market-header" className="bg-black">
+            {children.marketHeader}
           </div>
-          <div className="h-full">
-            {children.chart}
+          
+          <div key="chart" className="relative bg-black overflow-hidden">
+            <div className="drag-handle">
+              <DragHandle />
+            </div>
+            <div className="h-full">
+              {children.chart}
+            </div>
           </div>
-        </div>
-        
-        <div key="orderbook" className="relative border border-[#1a1a1a] overflow-hidden">
-          <div className="drag-handle">
-            <DragHandle />
+          
+          <div key="orderbook" className="relative bg-black overflow-hidden">
+            <div className="drag-handle">
+              <DragHandle />
+            </div>
+            <div className="h-full">
+              {children.orderBook}
+            </div>
           </div>
-          <div className="h-full">
-            {children.orderBook}
+          
+          <div key="sidebar" className="relative bg-[#0e0e0e] border-l border-[#1a1a1a] overflow-hidden">
+            <div className="drag-handle">
+              <DragHandle />
+            </div>
+            <div className="h-full">
+              {children.sidebar}
+            </div>
           </div>
-        </div>
-        
-        <div key="sidebar" className="relative border border-[#1a1a1a] overflow-hidden">
-          <div className="drag-handle">
-            <DragHandle />
+          
+          <div key="bottom-panel" className="relative bg-black border-t border-[#1a1a1a] overflow-hidden">
+            <div className="drag-handle">
+              <DragHandle />
+            </div>
+            <div className="h-full">
+              {children.bottomPanel || <div className="p-4 text-gray-500">Bottom Panel</div>}
+            </div>
           </div>
-          <div className="h-full">
-            {children.sidebar}
-          </div>
-        </div>
-      </ResponsiveGridLayout>
-    </div>
+        </ResponsiveGridLayout>
+      </div>
+    </DragContext.Provider>
   )
 }

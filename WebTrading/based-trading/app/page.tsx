@@ -34,6 +34,10 @@ const DraggableLayout = dynamic(() => import('@/components/DraggableLayout'), {
   ssr: false,
   loading: () => <div className="h-full bg-black" />
 })
+const SafeDraggableChart = dynamic(() => import('@/components/SafeDraggableChart'), { 
+  ssr: false,
+  loading: () => <div className="h-full bg-black" />
+})
 
 export default function TradingPage() {
   const [mounted, setMounted] = useState(false)
@@ -136,14 +140,15 @@ export default function TradingPage() {
                         />
                       ),
                       chart: (
-                        <TradingChart 
+                        <SafeDraggableChart 
                           currentSymbol={currentSymbol}
                           symbolName={symbolName}
                           showHeader={false}
                         />
                       ),
                       orderBook: <OrderBook />,
-                      sidebar: <Sidebar />
+                      sidebar: <Sidebar />,
+                      bottomPanel: <BottomPanel />
                     }}
                   </DraggableLayout>
                 </div>

@@ -192,11 +192,15 @@ export default function LightweightChart({ symbol, interval, indicators = ['volu
 
     // Handle resize
     const handleResize = () => {
-      if (chartContainerRef.current && chart) {
-        chart.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        })
+      if (chartContainerRef.current && chartRef.current) {
+        try {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight,
+          })
+        } catch (error) {
+          console.warn('Chart resize error (likely during drag):', error)
+        }
       }
     }
 
@@ -252,9 +256,20 @@ export default function LightweightChart({ symbol, interval, indicators = ['volu
     return () => {
       window.removeEventListener('resize', handleResize)
       unsubscribe()
-      if (chart) {
-        chart.remove()
+      
+      // Safely cleanup chart
+      if (chartRef.current) {
+        try {
+          chartRef.current.remove()
+        } catch (error) {
+          console.warn('Chart cleanup error:', error)
+        }
+        chartRef.current = null
       }
+      
+      // Clear all refs
+      candlestickSeriesRef.current = null
+      volumeSeriesRef.current = null
     }
   }, [symbol, interval, indicators])
 

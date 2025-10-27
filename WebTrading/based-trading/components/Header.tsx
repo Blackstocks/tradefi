@@ -20,12 +20,16 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         <nav className="hidden lg:flex items-center space-x-4 xl:space-x-6 ml-4 xl:ml-8">
           <button className="flex items-center space-x-1 text-sm hover:text-primary transition-colors">
-            <span>Trade</span>
+            <span><a href="/" className="text-sm hover:text-primary transition-colors">Trade</a></span>
             <ChevronDown className="h-3 w-3" />
           </button>
-          <a href="#" className="text-sm hover:text-primary transition-colors">Portfolio</a>
-          <a href="#" className="text-sm hover:text-primary transition-colors">Markets</a>
-          <a href="#" className="text-sm hover:text-primary transition-colors">Leaderboard</a>
+          <a href="#" className="text-sm hover:text-primary transition-colors">Orders</a>
+          <a href="/analytics" className="text-sm hover:text-primary transition-colors">Analytics</a>
+          <a href="#" className="text-sm hover:text-primary transition-colors">Explore</a>
+          <a href="#" className="text-sm hover:text-primary transition-colors">Points</a>
+          <a href="#" className="text-sm hover:text-primary transition-colors">Referrals</a>
+          <a href="/bot" className="text-sm hover:text-primary transition-colors">Bots</a>
+          <a href="/portfolio" className="text-sm hover:text-primary transition-colors">Portfolio</a>
         </nav>
       </div>
 

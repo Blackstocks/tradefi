@@ -1,10 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ChevronDown, Settings, User, LogOut, Menu } from 'lucide-react'
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [showAccountMenu, setShowAccountMenu] = useState(false)
+  const pathname = usePathname()
 
   return (
     <header className="bg-card border-b border-border h-14 flex items-center justify-between px-4">
@@ -19,17 +22,17 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
 
         <nav className="hidden lg:flex items-center space-x-4 xl:space-x-6 ml-4 xl:ml-8">
-          <button className="flex items-center space-x-1 text-sm hover:text-primary transition-colors">
-            <span><a href="/" className="text-sm hover:text-primary transition-colors">Trade</a></span>
+          <Link href="/" className={`flex items-center space-x-1 text-sm transition-colors ${pathname === '/' ? 'text-orange-500' : 'hover:text-primary'}`}>
+            <span>Trade</span>
             <ChevronDown className="h-3 w-3" />
-          </button>
-          <a href="#" className="text-sm hover:text-primary transition-colors">Orders</a>
-          <a href="/analytics" className="text-sm hover:text-primary transition-colors">Analytics</a>
+          </Link>
+          <Link href="/orders" className={`text-sm transition-colors ${pathname === '/orders' ? 'text-orange-500' : 'hover:text-primary'}`}>Orders</Link>
+          <Link href="/analytics" className={`text-sm transition-colors ${pathname === '/analytics' ? 'text-orange-500' : 'hover:text-primary'}`}>Analytics</Link>
           <a href="#" className="text-sm hover:text-primary transition-colors">Explore</a>
           <a href="#" className="text-sm hover:text-primary transition-colors">Points</a>
           <a href="#" className="text-sm hover:text-primary transition-colors">Referrals</a>
-          <a href="/bot" className="text-sm hover:text-primary transition-colors">Bots</a>
-          <a href="/portfolio" className="text-sm hover:text-primary transition-colors">Portfolio</a>
+          <Link href="/bot" className={`text-sm transition-colors ${pathname === '/bot' ? 'text-orange-500' : 'hover:text-primary'}`}>Bots</Link>
+          <Link href="/portfolio" className={`text-sm transition-colors ${pathname === '/portfolio' ? 'text-orange-500' : 'hover:text-primary'}`}>Portfolio</Link>
         </nav>
       </div>
 

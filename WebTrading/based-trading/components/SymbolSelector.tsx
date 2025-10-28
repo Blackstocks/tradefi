@@ -191,7 +191,7 @@ export default function SymbolSelector({ currentSymbol, onSymbolChange }: Symbol
 
             {filteredPairs.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No symbols found matching "{searchQuery}"
+                No symbols found matching &quot;{searchQuery}&quot;
               </div>
             )}
           </div>

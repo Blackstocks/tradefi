@@ -54,13 +54,14 @@ function TradingViewWidget({
       }
     }
     
-    if (container.current) {
-      container.current.appendChild(script)
+    const currentContainer = container.current
+    if (currentContainer) {
+      currentContainer.appendChild(script)
     }
 
     return () => {
-      if (container.current) {
-        container.current.innerHTML = ''
+      if (currentContainer) {
+        currentContainer.innerHTML = ''
       }
     }
   }, [symbol, interval, theme, hide_side_toolbar, allow_symbol_change, container_id])

@@ -355,31 +355,41 @@ export default function ExplorePage() {
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400"></th>
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">🟡</span>
+                          <div className="w-5 h-5 relative">
+                            <Image src="/image/binance.jpg" alt="Binance" fill className="object-cover rounded-full" />
+                          </div>
                           <span>Binance</span> <span className="text-gray-600">⚡</span>
                         </div>
                       </th>
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">
                         <div className="flex items-center gap-2">
-                          <span className="bg-white text-black rounded px-1 text-[10px] font-bold">BYBIT</span>
-                          Bybit <span className="text-gray-600">⚡</span>
+                          <div className="w-5 h-5 relative">
+                            <Image src="/image/bybit.webp" alt="Bybit" fill className="object-cover rounded-full" />
+                          </div>
+                          <span>Bybit</span> <span className="text-gray-600">⚡</span>
                         </div>
                       </th>
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">
                         <div className="flex items-center gap-2">
-                          <span className="bg-white text-black rounded px-1 text-[10px] font-bold">OKX</span>
-                          OKX <span className="text-gray-600">⚡</span>
+                          <div className="w-5 h-5 relative">
+                            <Image src="/image/okx.png" alt="OKX" fill className="object-cover rounded-full" />
+                          </div>
+                          <span>OKX</span> <span className="text-gray-600">⚡</span>
                         </div>
                       </th>
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">🌊</span>
+                          <div className="w-5 h-5 relative">
+                            <Image src="/image/hyper.png" alt="Hyperliquid" fill className="object-cover rounded-full" />
+                          </div>
                           <span>Hyperliquid</span> <span className="text-gray-600">⚡</span>
                         </div>
                       </th>
                       <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">🔷</span>
+                          <div className="w-5 h-5 relative">
+                            <Image src="/image/bitget.webp" alt="Bitget" fill className="object-cover rounded-full" />
+                          </div>
                           <span>Bitget</span> <span className="text-gray-600">⚡</span>
                         </div>
                       </th>

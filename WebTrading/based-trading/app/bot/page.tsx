@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { ChevronDown, Activity, DollarSign, TrendingUp, RotateCcw, Play, Pause, Ban } from 'lucide-react'
+import Image from 'next/image'
 
 export default function BotPage() {
   const [selectedAccount, setSelectedAccount] = useState('Select Account')
@@ -318,7 +319,9 @@ export default function BotPage() {
                     <td className="py-3">
                       <div className="flex items-center gap-2">
                         {row.account === 'Aster' && (
-                          <img src="/image/aster.png" alt="Aster" className="w-5 h-5 rounded-full" />
+                          <div className="relative w-5 h-5">
+                            <Image src="/image/aster.png" alt="Aster" fill className="object-cover rounded-full" />
+                          </div>
                         )}
                         {row.account === 'H2' && (
                           <div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-xs font-bold">H2</div>

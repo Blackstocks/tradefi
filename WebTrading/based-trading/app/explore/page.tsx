@@ -51,6 +51,23 @@ const mockTopLosers: Token[] = [
   { symbol: 'TRUMP3S', price: 0.01583, change24h: -36.16, volume: 1.32, volumeUSD: 1320 }
 ]
 
+const mockDexTokens = [
+  { symbol: 'DUSD', icon: '💎', price: '0.9992709', change: 0, marketCap: '191.46M', liquidity: '360.16M', volume: '29.85M' },
+  { symbol: 'TRUMP', icon: '👤', price: '6.894991', change: 0.36, marketCap: '1.38B', liquidity: '312.60M', volume: '29.18M' },
+  { symbol: 'KOGE', icon: '🦅', price: '48.005517', change: 0, marketCap: '162.26M', liquidity: '55.46M', volume: '23.62M' },
+  { symbol: 'quq', icon: '🐸', price: '0.002800399', change: -0.04, marketCap: '2.46M', liquidity: '3.71M', volume: '20.62M' },
+  { symbol: 'VIRTUAL', icon: '🔵', price: '1.595295', change: 2.43, marketCap: '793.48M', liquidity: '16.50M', volume: '10.46M' },
+  { symbol: 'syrupUS…', icon: '🍯', price: '1.133329', change: 0, marketCap: '261.57M', liquidity: '38.90M', volume: '9.19M' },
+  { symbol: 'Anome', icon: '👾', price: '0.1558508', change: 1.47, marketCap: '4.68M', liquidity: '1.64M', volume: '6.19M' },
+  { symbol: 'MERL', icon: '🔮', price: '0.3678219', change: 0.54, marketCap: '36.70M', liquidity: '2.31M', volume: '5.35M' },
+  { symbol: 'AICel1', icon: '🤖', price: '0.002500167', change: 0.01, marketCap: '2.38M', liquidity: '2.65M', volume: '4.39M' },
+  { symbol: 'BOOST', icon: '🚀', price: '0.1688181', change: -1.95, marketCap: '24.96M', liquidity: '2.39M', volume: '3.65M' },
+  { symbol: 'HUMA', icon: '🧬', price: '0.02734113', change: 0.42, marketCap: '4.50M', liquidity: '195.93K', volume: '3.12M' },
+  { symbol: 'PUMP', icon: '💧', price: '0.005039544', change: -0.82, marketCap: '5.04B', liquidity: '34.32M', volume: '2.62M' },
+  { symbol: 'TAKE', icon: '🎯', price: '0.2799729', change: -0.54, marketCap: '23.58M', liquidity: '3.24M', volume: '2.27M' },
+  { symbol: 'PIGGY', icon: '🐷', price: '1.574532', change: 8.32, marketCap: '125.96M', liquidity: '1.71M', volume: '2.11M' }
+]
+
 const mockFundingData = [
   { symbol: 'AIXBT', binance: 0.3373, bybit: 10.95, okx: -6.995, hyperliquid: -4.981, bitget: 10.95 },
   { symbol: 'SCR', icon: '📋', binance: 10.95, bybit: 10.95, okx: 66.336, hyperliquid: 10.95, bitget: 10.95 },
@@ -167,7 +184,14 @@ export default function ExplorePage() {
             >
               Funding Yield
             </button>
-            <button className="text-sm text-gray-400 hover:text-white">
+            <button 
+              onClick={() => setActiveTab('dex')}
+              className={`text-sm font-medium pb-1 ${
+                activeTab === 'dex' 
+                  ? 'text-orange-500 border-b-2 border-orange-500' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
               Dex Explore
             </button>
           </div>
@@ -526,8 +550,111 @@ export default function ExplorePage() {
           )}
 
           {activeTab === 'dex' && (
-            <div className="text-center py-16 text-gray-500">
-              <div className="text-sm">Dex Explore coming soon...</div>
+            <div className="space-y-4">
+              {/* DEX Tokens Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg">DEX Tokens</h2>
+                <div className="flex items-center gap-4">
+                  {/* Search */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search tokens..."
+                      className="w-64 bg-[#0f0f0f] border border-[#2a2a2a] rounded-md pl-4 pr-4 py-2 text-sm focus:outline-none focus:border-[#3a3a3a] placeholder-gray-600"
+                    />
+                  </div>
+                  
+                  {/* Time buttons */}
+                  <div className="flex gap-1">
+                    {['5m', '1h', '4h', '24h'].map((time) => (
+                      <button
+                        key={time}
+                        className={`px-3 py-1.5 text-sm ${
+                          time === '24h' 
+                            ? 'bg-[#1a1a1a] text-white' 
+                            : 'text-gray-400 hover:text-white'
+                        } rounded`}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Network dropdown */}
+                  <div className="relative">
+                    <button className="flex items-center gap-2 bg-[#0f0f0f] border border-[#2a2a2a] rounded-md px-4 py-2 text-sm">
+                      All Networks
+                      <span className="text-gray-400">▼</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* DEX Table */}
+              <div className="bg-[#0f0f0f] rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="border-b border-[#1a1a1a]">
+                    <tr>
+                      <th className="text-left py-2 px-3 text-[10px] font-normal text-gray-400">Token</th>
+                      <th className="text-right py-2 px-3 text-[10px] font-normal text-gray-400">Price</th>
+                      <th className="text-right py-2 px-3 text-[10px] font-normal text-gray-400">
+                        <div className="flex items-center justify-end gap-1">
+                          Change % <span className="text-[8px]">⬇</span>
+                        </div>
+                      </th>
+                      <th className="text-right py-2 px-3 text-[10px] font-normal text-gray-400">
+                        <div className="flex items-center justify-end gap-1">
+                          Market Cap <span className="text-[8px]">⬇</span>
+                        </div>
+                      </th>
+                      <th className="text-right py-2 px-3 text-[10px] font-normal text-gray-400">Liquidity</th>
+                      <th className="text-right py-2 px-3 text-[10px] font-normal text-gray-400">
+                        <div className="flex items-center justify-end gap-1">
+                          Volume <span className="text-[8px]">⬇</span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mockDexTokens.map((token, index) => (
+                      <tr key={index} className={`border-b border-gray-700/50 hover:bg-[#2a2a2a] transition-colors ${
+                        index % 2 === 0 ? 'bg-[#0f0f0f]' : 'bg-[#141414]'
+                      }`}>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <button className="text-gray-600 hover:text-orange-500">
+                              <Star className="h-3 w-3" />
+                            </button>
+                            {token.icon && (
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-gray-800">
+                                <span className="text-sm">{token.icon}</span>
+                              </div>
+                            )}
+                            <span className="text-[10px] font-medium">{token.symbol}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right text-[10px]">
+                          ${token.price}
+                        </td>
+                        <td className={`py-2 px-3 text-right text-[10px] ${
+                          token.change >= 0 ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                          {token.change >= 0 ? '+' : ''}{token.change}%
+                        </td>
+                        <td className="py-2 px-3 text-right text-[10px]">
+                          ${token.marketCap}
+                        </td>
+                        <td className="py-2 px-3 text-right text-[10px]">
+                          ${token.liquidity}
+                        </td>
+                        <td className="py-2 px-3 text-right text-[10px]">
+                          ${token.volume}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

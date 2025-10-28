@@ -28,7 +28,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </Link>
           <Link href="/orders" className={`text-sm transition-colors ${pathname === '/orders' ? 'text-orange-500' : 'hover:text-primary'}`}>Orders</Link>
           <Link href="/analytics" className={`text-sm transition-colors ${pathname === '/analytics' ? 'text-orange-500' : 'hover:text-primary'}`}>Analytics</Link>
-          <a href="#" className="text-sm hover:text-primary transition-colors">Explore</a>
+          <Link href="/explore" className={`text-sm transition-colors ${pathname === '/explore' ? 'text-orange-500' : 'hover:text-primary'}`}>Explore</Link>
           <a href="#" className="text-sm hover:text-primary transition-colors">Points</a>
           <a href="#" className="text-sm hover:text-primary transition-colors">Referrals</a>
           <Link href="/bot" className={`text-sm transition-colors ${pathname === '/bot' ? 'text-orange-500' : 'hover:text-primary'}`}>Bots</Link>
